@@ -7,13 +7,17 @@ defmodule Shortener.Application do
 
   @impl true
   def start(_type, _args) do
-    port = String.to_integer(System.get_env("PORT", "4000"))
-
-    children = [
-      Shortener.Store,
-      {Bandit, plug: Shortener.Router, port: port}
-    ]
+    children = [Shortener.Store] ++ web_children()
 
     Supervisor.start_link(children, strategy: :one_for_one, name: Shortener.Supervisor)
+  end
+
+  defp web_children do
+    if Application.get_env(:shortener, :start_server, true) do
+      port = String.to_integer(System.get_env("PORT", "4000"))
+      [{Bandit, plug: Shortener.Router, port: port}]
+    else
+      []
+    end
   end
 end
