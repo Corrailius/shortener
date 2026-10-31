@@ -1,15 +1,19 @@
 defmodule Shortener.Application do
-  # See https://hexdocs.pm/elixir/Application.html
-  # for more information on OTP Applications
   @moduledoc false
 
   use Application
 
   @impl true
   def start(_type, _args) do
-    children = [Shortener.Store] ++ web_children()
+    db = System.get_env("DB_PATH") || Application.get_env(:shortener, :db_path, "shortener.db")
 
-    Supervisor.start_link(children, strategy: :one_for_one, name: Shortener.Supervisor)
+    children = [{Shortener.Repo, database: db, pool_size: 1}] ++ web_children()
+
+    with {:ok, sup} <-
+           Supervisor.start_link(children, strategy: :one_for_one, name: Shortener.Supervisor) do
+      Shortener.Store.setup()
+      {:ok, sup}
+    end
   end
 
   defp web_children do

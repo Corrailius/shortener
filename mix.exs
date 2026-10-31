@@ -14,7 +14,7 @@ defmodule Shortener.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :crypto],
       mod: {Shortener.Application, []}
     ]
   end
@@ -23,7 +23,10 @@ defmodule Shortener.MixProject do
   defp deps do
     [
       {:plug, "~> 1.16"},
-      {:bandit, "~> 1.5"}
+      {:bandit, "~> 1.5"},
+      {:ecto_sql, "~> 3.12"},
+      {:ecto_sqlite3, "~> 0.17"},
+      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false}
     ]
   end
 end
