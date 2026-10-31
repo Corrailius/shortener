@@ -33,4 +33,12 @@ defmodule Shortener.RouterTest do
     conn = conn(:get, "/nope") |> Shortener.Router.call(@opts)
     assert conn.status == 404
   end
+
+  test "rejects URLs longer than 2048 bytes" do
+    too_long = "https://example.com/?q=" <> String.duplicate("a", 2048)
+    assert post_url(too_long).status == 400
+
+    ok = "https://example.com/?q=" <> String.duplicate("a", 2000)
+    assert post_url(ok).status == 201
+  end
 end

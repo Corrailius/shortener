@@ -28,7 +28,7 @@ defmodule Shortener.Router do
     send_resp(conn, 404, "not found\n")
   end
 
-  defp valid_url?(url) when is_binary(url) do
+  defp valid_url?(url) when is_binary(url) and byte_size(url) <= 2048 do
     case URI.parse(url) do
       %URI{scheme: s, host: h} when s in ["http", "https"] and is_binary(h) -> true
       _ -> false
