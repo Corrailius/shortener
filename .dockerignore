@@ -1,0 +1,8 @@
+_build
+deps
+.git
+.github
+.elixir_ls
+*.db*
+.env
+erl_crash.dump
