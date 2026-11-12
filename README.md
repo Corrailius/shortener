@@ -1,52 +1,82 @@
 # Shortener
 
-A minimal URL shortener built with Elixir, Plug and Bandit. Links are kept
-in memory, so they are lost on restart.
+A lightweight URL shortener built with Elixir, Plug and Bandit.
+
+## Features
+
+- Professional HTML interface in the browser at `/`
+- API-compatible POST endpoint for scripts and curl
+- SQLite persistence with a migration file for permanent storage
+- Security checks for malformed URLs and injection attempts
+- Automated tests with Mix
 
 ## Requirements
 
-- Elixir 1.20+ and Erlang/OTP 28+
+- Elixir 1.20+
+- Erlang/OTP 28+
 
-## Run
+## Run locally
 
 ```bash
 mix deps.get
+mix test
+mix format
+$env:PATH = "C:\elixir-install\otp\bin;C:\elixir-install\elixir\bin;$env:PATH"
 mix run --no-halt
 ```
 
-The server listens on port 4000. Set `PORT` to change it.
+Then open:
+
+- http://localhost:4000
+
+The server listens on port `4000` by default. You can override it with:
+
+```bash
+PORT=5000 mix run --no-halt
+```
 
 ## Usage
 
-Shorten a URL:
+### Browser interface
+
+Open the app in a browser and paste a URL into the form.
+
+### CLI/API
 
 ```bash
-curl --data-urlencode "url=https://elixir-lang.org" localhost:4000
+curl.exe --data-urlencode "url=https://elixir-lang.org" http://localhost:4000
 # http://localhost:4000/AbC123x
 ```
 
-Follow it:
+Follow the redirect:
 
 ```bash
-curl -i localhost:4000/AbC123x
-# HTTP/1.1 302 ... location: https://elixir-lang.org
+curl.exe -I http://localhost:4000/AbC123x
 ```
-
-Use `--data-urlencode` so `&` and `+` in long URLs survive. On Windows
-PowerShell, use `curl.exe` instead of `curl`.
 
 | Method | Path     | Result                                        |
 |--------|----------|-----------------------------------------------|
+| GET    | `/`      | Professional page with a form                 |
 | POST   | `/`      | `201` with short URL, or `400` if invalid     |
 | GET    | `/:code` | `302` redirect, or `404` if the code is unknown |
 
 Only `http` and `https` URLs are accepted. The destination is not checked
 for reachability.
 
+## Persistence
+
+The application stores short links in SQLite through an Ecto migration in:
+
+- `priv/repo/migrations/`
+
+The database file is stored locally as `shortener_dev.db` by default and is kept
+between restarts.
+
 ## Test
 
 ```bash
 mix test
+mix format
 ```
 
 ## Docker
@@ -58,13 +88,5 @@ docker run -p 4000:4000 shortener
 
 ## CI/CD
 
-GitHub Actions checks formatting, compiles with warnings as errors and runs
-the tests on every push and pull request. Pushes to `main` also publish an
-image to `ghcr.io/<owner>/<repo>`.
-
-## Limitations
-
-- In-memory storage (Agent), no persistence
-- No rate limiting
-- The returned short URL is built from the request host and port, so behind
-  a reverse proxy it needs a configurable base URL
+GitHub Actions can validate formatting and run the automated test suite on each
+push and pull request.

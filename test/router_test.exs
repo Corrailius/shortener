@@ -1,14 +1,31 @@
 defmodule Shortener.RouterTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   import Plug.Test
   import Plug.Conn
 
   @opts Shortener.Router.init([])
 
+  setup do
+    Shortener.Store.setup()
+    Shortener.Repo.query!("DELETE FROM links")
+    :ok
+  end
+
   defp post_url(url) do
     conn(:post, "/", "url=" <> URI.encode_www_form(url))
     |> put_req_header("content-type", "application/x-www-form-urlencoded")
     |> Shortener.Router.call(@opts)
+  end
+
+  test "homepage renders a professional UI" do
+    conn =
+      conn(:get, "/")
+      |> put_req_header("accept", "text/html")
+      |> Shortener.Router.call(@opts)
+
+    assert conn.status == 200
+    assert conn.resp_body =~ "YBoost Shortener"
+    assert conn.resp_body =~ "<form"
   end
 
   test "shortens a URL and redirects to it" do
@@ -23,6 +40,32 @@ defmodule Shortener.RouterTest do
     assert get_resp_header(conn, "location") == [url]
   end
 
+  test "forward path retrieves the original response content" do
+    url = "http://example.com"
+    conn = post_url(url)
+    assert conn.status == 201
+
+    code = conn.resp_body |> String.trim() |> String.split("/") |> List.last()
+    conn = conn(:get, "/forward/#{code}") |> Shortener.Router.call(@opts)
+
+    assert conn.status == 200
+    assert conn.resp_body =~ "Example Domain"
+  end
+
+  test "browser POST returns the HTML page after shortening" do
+    url = "https://www.example.com/super/route"
+
+    conn =
+      conn(:post, "/", "url=" <> URI.encode_www_form(url))
+      |> put_req_header("content-type", "application/x-www-form-urlencoded")
+      |> put_req_header("accept", "text/html")
+      |> Shortener.Router.call(@opts)
+
+    assert conn.status == 201
+    assert conn.resp_body =~ "Votre lien raccourci"
+    assert conn.resp_body =~ "https://www.example.com/super/route"
+  end
+
   test "rejects invalid and dangerous URLs" do
     for bad <- ["notaurl", "ftp://example.com/f", "javascript:alert(1)", ""] do
       assert post_url(bad).status == 400
@@ -32,5 +75,42 @@ defmodule Shortener.RouterTest do
   test "unknown code returns 404" do
     conn = conn(:get, "/nope") |> Shortener.Router.call(@opts)
     assert conn.status == 404
+  end
+
+  test "rejects URLs longer than 2048 bytes" do
+    too_long = "https://example.com/?q=" <> String.duplicate("a", 2048)
+    assert post_url(too_long).status == 400
+
+    ok = "https://example.com/?q=" <> String.duplicate("a", 2000)
+    assert post_url(ok).status == 201
+  end
+
+  test "rejects header injection, whitespace and credentials" do
+    for bad <- [
+          "https://example.com/a\r\nSet-Cookie: x=1",
+          "https://example.com/a b",
+          "https://user:pass@example.com/"
+        ] do
+      assert post_url(bad).status == 400
+    end
+  end
+
+  test "SQL injection payloads are stored as data, never executed" do
+    evil = "https://example.com/?q='%20OR%201=1;DROP%20TABLE%20links;--"
+    conn = post_url(evil)
+    assert conn.status == 201
+
+    code = conn.resp_body |> String.trim() |> String.split("/") |> List.last()
+    conn = conn(:get, "/#{code}") |> Shortener.Router.call(@opts)
+    assert get_resp_header(conn, "location") == [evil]
+
+    conn = conn(:get, "/%27%20OR%201=1--") |> Shortener.Router.call(@opts)
+    assert conn.status == 404
+  end
+
+  test "responses carry security headers" do
+    conn = conn(:get, "/nope") |> Shortener.Router.call(@opts)
+    assert get_resp_header(conn, "x-content-type-options") == ["nosniff"]
+    assert ["text/plain" <> _] = get_resp_header(conn, "content-type")
   end
 end
